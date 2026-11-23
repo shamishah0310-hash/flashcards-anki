@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text to Flashcards & Quiz with Anki Export</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    .perspective-1000 { perspective: 1000px; }
+    .transform-style-3d { transform-style: preserve-3d; }
+    .backface-hidden { backface-visibility: hidden; }
+    .rotate-y-180 { transform: rotateY(180deg); }
+  </style>
+</head>
+<body class="bg-[#070a11] text-slate-100 min-h-screen flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <i data-lucide="layers" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <span class="font-bold text-lg text-white">Flashcard & Quiz Studio</span>
+          <span class="ml-2 px-2 py-0.5 text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full">Anki Ready</span>
+        </div>
+      </div>
+      <button onclick="exportAnki()" class="px-3.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all">
+        <i data-lucide="download" class="w-4 h-4"></i> 1-Click Anki CSV
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Left Panel: Input & Settings (5 cols) -->
+    <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col space-y-4">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold text-slate-300">Study Source Text</span>
+        <label class="cursor-pointer text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium">
+          <i data-lucide="upload" class="w-3.5 h-3.5"></i> Upload PDF/TXT
+          <input type="file" id="file-input" accept=".pdf,.txt,.md" class="hidden" onchange="handleUpload(event)">
+        </label>
+      </div>
+
+      <textarea id="source-text" rows="8" class="w-full bg-slate-850 border border-slate-700 rounded-xl p-3.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none flex-1 leading-relaxed bg-[#111928]" placeholder="Paste your study notes, article, or lecture text here..."></textarea>
+
+      <!-- Controls -->
+      <div class="space-y-3 pt-2 border-t border-slate-800">
+        <div>
+          <label class="text-xs text-slate-400 block mb-1.5 font-medium">Difficulty Calibration</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="setDiff('easy')" id="diff-easy" class="py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-slate-800 text-slate-400">Easy (Facts)</button>
+            <button onclick="setDiff('medium')" id="diff-medium" class="py-1.5 rounded-lg text-xs font-medium border border-indigo-500/50 bg-indigo-500/20 text-indigo-300">Medium (Concepts)</button>
+            <button onclick="setDiff('hard')" id="diff-hard" class="py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-slate-800 text-slate-400">Hard (Synthesis)</button>
+          </div>
+        </div>
+
+        <button onclick="generateDeck()" id="gen-btn" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all">
+          <i data-lucide="sparkles" class="w-4 h-4"></i> Generate High-Yield Deck
+        </button>
+      </div>
+    </div>
+
+    <!-- Right Panel: Interactive 3D Card & Quiz (7 cols) -->
+    <div class="lg:col-span-7 flex flex-col space-y-4">
+      <div class="flex items-center justify-between bg-slate-900 border border-slate-800 p-2 rounded-xl">
+        <div class="flex items-center space-x-2">
+          <button onclick="toggleView('cards')" id="tab-cards" class="px-3 py-1 rounded-lg text-xs font-medium bg-indigo-600 text-white">
+            🎴 Flashcards (<span id="count-cards">0</span>)
+          </button>
+          <button onclick="toggleView('quiz')" id="tab-quiz" class="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white">
+            📝 Quiz MCQs (<span id="count-quiz">0</span>)
+          </button>
+        </div>
+        <span class="text-[11px] text-slate-400">Spacebar or click to flip</span>
+      </div>
+
+      <!-- 3D Card Area -->
+      <div id="view-cards" class="flex-1 flex flex-col items-center justify-center p-6 bg-slate-900 border border-slate-800 rounded-2xl min-h-[380px]">
+        <div class="w-full max-w-md h-64 perspective-1000 cursor-pointer" onclick="flipCard()">
+          <div id="flipper" class="relative w-full h-full transform-style-3d transition-transform duration-500 shadow-2xl rounded-2xl border border-slate-700">
+            <!-- Front -->
+            <div class="absolute inset-0 backface-hidden bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-2xl flex flex-col justify-between">
+              <div class="flex items-center justify-between text-xs text-indigo-400 font-semibold">
+                <span id="card-tag">Prompt</span>
+                <span>Click to Flip ↺</span>
+              </div>
+              <div id="card-front" class="text-center font-medium text-sm text-white px-3">
+                Paste study notes on the left and click "Generate High-Yield Deck" to start!
+              </div>
+              <div class="text-center text-[11px] text-slate-500">
+                Card <span id="idx-curr">1</span> of <span id="idx-total">1</span>
+              </div>
+            </div>
+            <!-- Back -->
+            <div class="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-indigo-950 to-slate-900 p-6 rounded-2xl flex flex-col justify-between border border-indigo-500/30">
+              <div class="flex items-center justify-between text-xs text-emerald-400 font-semibold">
+                <span>Verified Answer</span>
+                <span>Click to Flip Back ↻</span>
+              </div>
+              <div id="card-back" class="text-center text-xs text-slate-200 leading-relaxed overflow-y-auto px-3">
+                Answer will appear here.
+              </div>
+              <div class="text-center text-[11px] text-slate-500">Active Recall Verification</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex items-center space-x-4 mt-6">
+          <button onclick="prevCard()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">
+            <i data-lucide="chevron-left" class="w-5 h-5"></i>
+          </button>
+          <button onclick="nextCard()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">
+            <i data-lucide="chevron-right" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quiz Area -->
+      <div id="view-quiz" class="hidden flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 overflow-y-auto space-y-4 max-h-[460px]">
+        <div id="quiz-list" class="space-y-4">
+          <p class="text-xs text-slate-400">Generate a deck to unlock interactive multiple-choice test questions.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    lucide.createIcons();
+    let deck = null;
+    let cardIdx = 0;
+    let flipped = false;
+    let difficulty = 'medium';
+
+    function setDiff(lvl) {
+      difficulty = lvl;
+      ['easy', 'medium', 'hard'].forEach(l => {
+        const b = document.getElementById(`diff-${l}`);
+        b.className = l === lvl ? "py-1.5 rounded-lg text-xs font-medium border border-indigo-500/50 bg-indigo-500/20 text-indigo-300" : "py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-slate-800 text-slate-400";
+      });
+    }
+
+    function toggleView(v) {
+      document.getElementById('view-cards').classList.toggle('hidden', v !== 'cards');
+      document.getElementById('view-quiz').classList.toggle('hidden', v !== 'quiz');
+      document.getElementById('tab-cards').className = v === 'cards' ? "px-3 py-1 rounded-lg text-xs font-medium bg-indigo-600 text-white" : "px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white";
+      document.getElementById('tab-quiz').className = v === 'quiz' ? "px-3 py-1 rounded-lg text-xs font-medium bg-indigo-600 text-white" : "px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white";
+    }
+
+    function flipCard() {
+      flipped = !flipped;
+      document.getElementById('flipper').classList.toggle('rotate-y-180', flipped);
+    }
+
+    function renderCard() {
+      if (!deck || !deck.flashcards.length) return;
+      const c = deck.flashcards[cardIdx];
+      document.getElementById('card-tag').textContent = c.tag || "Active Recall";
+      document.getElementById('card-front').textContent = c.front;
+      document.getElementById('card-back').textContent = c.back;
+      document.getElementById('idx-curr').textContent = cardIdx + 1;
+      document.getElementById('idx-total').textContent = deck.flashcards.length;
+      flipped = false;
+      document.getElementById('flipper').classList.remove('rotate-y-180');
+    }
+
+    function nextCard() {
+      if (deck && cardIdx < deck.flashcards.length - 1) { cardIdx++; renderCard(); }
+    }
+    function prevCard() {
+      if (deck && cardIdx > 0) { cardIdx--; renderCard(); }
+    }
+
+    async function generateDeck() {
+      const text = document.getElementById('source-text').value.trim();
+      if (text.length < 30) return alert("Please enter at least a paragraph of study text.");
+      const btn = document.getElementById('gen-btn');
+      btn.disabled = true;
+      btn.textContent = "Synthesizing...";
+
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, difficulty, card_count: 8, mcq_count: 4, provider: 'groq' })
+        });
+        deck = await res.json();
+        cardIdx = 0;
+        document.getElementById('count-cards').textContent = (deck.flashcards || []).length;
+        document.getElementById('count-quiz').textContent = (deck.quizzes || []).length;
+        renderCard();
+        renderQuizzes(deck.quizzes || []);
+      } catch (e) {
+        alert("Error: " + e);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Generate High-Yield Deck";
+      }
+    }
+
+    function renderQuizzes(quizzes) {
+      const qList = document.getElementById('quiz-list');
+      qList.innerHTML = "";
+      quizzes.forEach((q, i) => {
+        const d = document.createElement('div');
+        d.className = "p-4 rounded-xl bg-slate-800 border border-slate-700 space-y-3";
+        let opts = q.options.map(opt => `
+          <button onclick="checkAnswer(this, '${opt.trim()[0]}', '${q.correct_answer}', '${q.explanation.replace(/'/g, "\\'")}')" class="w-full text-left p-2.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-slate-500 text-xs text-slate-200 transition-all flex items-center justify-between">
+            <span>${opt}</span>
+            <span class="ans-badge"></span>
+          </button>
+        `).join('');
+        d.innerHTML = `
+          <div class="text-xs font-semibold text-indigo-400">Question ${i + 1}</div>
+          <div class="text-xs font-medium text-white">${q.question}</div>
+          <div class="space-y-2 mt-2">${opts}</div>
+          <div class="exp-box hidden p-3 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-300 mt-2"></div>
+        `;
+        qList.appendChild(d);
+      });
+    }
+
+    function checkAnswer(btn, chosen, correct, exp) {
+      const p = btn.parentElement;
+      p.querySelectorAll('button').forEach(b => b.disabled = true);
+      if (chosen.toUpperCase() === correct.toUpperCase()) {
+        btn.classList.add('border-emerald-500', 'bg-emerald-500/20', 'text-emerald-300');
+        btn.querySelector('.ans-badge').innerHTML = "✓ Correct";
+      } else {
+        btn.classList.add('border-rose-500', 'bg-rose-500/20', 'text-rose-300');
+        btn.querySelector('.ans-badge').innerHTML = "✗ Incorrect";
+      }
+      const expBox = p.parentElement.querySelector('.exp-box');
+      expBox.classList.remove('hidden');
+      expBox.innerHTML = `<strong>Explanation:</strong> ${exp}`;
+    }
+
+    async function exportAnki() {
+      if (!deck || !deck.flashcards) return alert("Please generate a deck first.");
+      const res = await fetch('/api/export/anki', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deck_title: deck.deck_title || "Study_Deck", flashcards: deck.flashcards })
+      });
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = window.URL.createObjectURL(blob);
+      a.download = `${deck.deck_title || 'study_deck'}_anki.csv`;
+      a.click();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { e.preventDefault(); flipCard(); }
+      else if (e.code === 'ArrowRight') nextCard();
+      else if (e.code === 'ArrowLeft') prevCard();
+    });
+  </script>
+</body>
+</html>

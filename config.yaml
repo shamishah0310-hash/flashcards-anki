@@ -1,0 +1,35 @@
+app:
+  name: "Flashcards & Quiz with Anki Export"
+  version: "1.0.0"
+  host: "127.0.0.1"
+  port: 8082
+
+default_provider: "groq"
+default_model: "llama-3.3-70b-versatile"
+
+flashcards:
+  default_card_count: 8
+  default_mcq_count: 4
+  default_difficulty: "medium"
+  dedupe_similarity_threshold: 0.82
+
+providers:
+  mock:
+    name: "Mock Engine (Offline Demo)"
+    base_url: "mock://local"
+    api_key: "not-needed"
+    enabled: true
+    models:
+      - id: "mock-fast-7b"
+        name: "Mock Fast 7B"
+  groq:
+    name: "Groq Cloud"
+    base_url: "https://api.groq.com/openai/v1"
+    api_key_env: "GROQ_API_KEY"
+    api_key: ""
+    enabled: true
+    models:
+      - id: "llama-3.3-70b-versatile"
+        name: "Llama 3.3 70B Versatile"
+      - id: "llama-3.1-8b-instant"
+        name: "Llama 3.1 8B Instant"
